@@ -1,6 +1,9 @@
 {
   "name": "guesswho-frontend-app",
   "version": "0.1.0",
+  "engines": {
+    "node":"19.3.0"
+  },
   "private": true,
   "dependencies": {
     "@material-ui/core": "^4.12.4",
