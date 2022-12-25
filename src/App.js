@@ -11,7 +11,7 @@ const useStyles = makeStyles({
   },
 });
 
-axios.defaults.baseURL = 'http://localhost:8080';
+const base_url = process.env.REACT_APP_BASE_URL;
 
 function App() {
   const [selectedCharacter, setSelectedCharacter] = useState('');
@@ -26,22 +26,22 @@ function App() {
 
   useEffect(() => {
     // Get the selected character from the server when the component mounts
-    axios.get('/selected_character')
+    axios.get(base_url + '/selected_character')
       .then(res => setSelectedCharacter(res.data.selected_character))
       .catch(err => console.error(err));
 
     // Make a request to the /characters endpoint to get the list of characters
-    axios.get('/characters')
+    axios.get(base_url + '/characters')
       .then(res => setCharacters(res.data.characters)) // store the list of characters in the characters state variable
       .catch(err => console.error(err));
 
     // Make a request to the /message_nums endpoint to get the max number of messages allowed
-    axios.get('/message_nums')
+    axios.get(base_url + '/message_nums')
       .then(res => setMaxMessages(res.data.max_messages))
       .catch(err => console.error(err));
 
     // Make a request to /message_nums endpoint to get current number of messages
-    axios.get('/message_nums')
+    axios.get(base_url + '/message_nums')
       .then(res => setNumMessages(res.data.current_messages))
       .catch(err => console.error(err));
   }, []);
@@ -69,7 +69,7 @@ function App() {
       }]);
     } else {
       // If the maximum number of messages has not been reached, send the message to the server
-      axios.post('/chat', { text: messageText })
+      axios.post(base_url + '/chat', { text: messageText })
         .then(res => {
           setMessages(prevMessages => [...prevMessages, {
             sender: '- You',
@@ -89,7 +89,7 @@ function App() {
   const handleGuessSubmit = e => {
     e.preventDefault();
     // Send a character guess to the server
-    axios.post('/guess', { character: guess })
+    axios.post(base_url + '/guess', { character: guess })
       .then(res => {
         if (res.data.correct) {
           setMessages(prevMessages => [...prevMessages, {
@@ -108,13 +108,13 @@ function App() {
   };
 
   const handleRestart = () => {
-    axios.post('/reset')
+    axios.post(base_url + '/reset')
       .then(res => {
         // Reset the number of messages and the list of messages
         setNumMessages(0);
         setMessages([]);
         // Get the new selected character from the server
-        axios.get('/selected_character')
+        axios.get(base_url + '/selected_character')
           .then(res => setSelectedCharacter(res.data.selected_character))
           .catch(err => console.error(err));
       })
