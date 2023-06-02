@@ -44,7 +44,8 @@ function App() {
       axios.post(base_url + '/change_character', { gameCookie })
         .then(res => {
           setSelectedCharacter(res.data.character);
-          updateGameCookie();
+
+          Cookies.set('game_cookie', JSON.stringify({ numMessages: numMessages, selectedCharacter: res.data.character }));
         })
         .catch(err => console.error(err));
     }
@@ -58,21 +59,31 @@ function App() {
     setGuess(e.target.value);
   };
 
+  // who knows maybe i just got this one working fine too
   const handleMessageSubmit = e => {
     e.preventDefault();
     axios.post(base_url + '/chat', { text: messageText, gameCookie })
       .then(res => {
+        const isMaxMessages = "error" in res.data ? true : false;
+        const newNumMessages = res.data.game_cookie.num_messages;
+        const message = res.data.message;
+        const response = res.data.response;
+
         setMessages(prevMessages => [...prevMessages, {
-            sender: '- You',
-            text: res.data.message.text
-          }]);
+          sender: '- You',
+          text: message
+        }]);
         setMessages(prevMessages => [...prevMessages, {
-            sender: '- Mystery Character',
-            text: res.data.response
-          }]);
+          sender: '- Mystery Character',
+          text: response
+        }]);
+        if (isMaxMessages) {
+          console.log(res.data.error);
+        }
         setMessageText('');
-        setNumMessages(prevNumMessages => prevNumMessages + 1);
-        updateGameCookie();
+        setNumMessages(newNumMessages)
+
+        Cookies.set('game_cookie', JSON.stringify({ numMessages: newNumMessages, selectedCharacter: selectedCharacter }));
       })
       .catch(err => console.error(err));
   };
