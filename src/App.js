@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import Chat from './Chat'; // import the new Chat component
+import Cookies from 'js-cookie';
+import Chat from './Chat';
 import './App.css';
 import { FormControl, InputLabel, Input, Button, Select, MenuItem } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
@@ -14,36 +15,39 @@ const useStyles = makeStyles({
 const base_url = process.env.REACT_APP_BASE_URL;
 
 function App() {
-  const [selectedCharacter, setSelectedCharacter] = useState('');
-  const [maxMessages, setMaxMessages] = useState(0);
+  const [maxMessages, setMaxMessages] = useState(5); // Maximum number of messages
   const [messages, setMessages] = useState([]);
-  const [numMessages, setNumMessages] = useState(0);
   const [messageText, setMessageText] = useState('');
   const [guess, setGuess] = useState('');
-  const [characters, setCharacters] = useState([]); // add a state variable to store the list of characters
+  const [characters, setCharacters] = useState([]);
+
+  // Initialize game state from the cookie, or with default values
+  const gameCookie = Cookies.get('game_cookie') ? JSON.parse(Cookies.get('game_cookie')) : { numMessages: 0, selectedCharacter: '' };
+  const [numMessages, setNumMessages] = useState(gameCookie.numMessages);
+  const [selectedCharacter, setSelectedCharacter] = useState(gameCookie.selectedCharacter);
 
   const classes = useStyles();
 
+  // this and useEffect needed the biggest changes so far
+  const updateGameCookie = () => {
+    Cookies.set('game_cookie', JSON.stringify({ numMessages, selectedCharacter }));
+  };
+
   useEffect(() => {
-    // Get the selected character from the server when the component mounts
-    axios.get(base_url + '/selected_character')
-      .then(res => setSelectedCharacter(res.data.selected_character))
-      .catch(err => console.error(err));
-
-    // Make a request to the /characters endpoint to get the list of characters
+    // Get the characters from the server when the component mounts
     axios.get(base_url + '/characters')
-      .then(res => setCharacters(res.data.characters)) // store the list of characters in the characters state variable
+      .then(res => setCharacters(res.data.characters))
       .catch(err => console.error(err));
 
-    // Make a request to the /message_nums endpoint to get the max number of messages allowed
-    axios.get(base_url + '/message_nums')
-      .then(res => setMaxMessages(res.data.max_messages))
-      .catch(err => console.error(err));
-
-    // Make a request to /message_nums endpoint to get current number of messages
-    axios.get(base_url + '/message_nums')
-      .then(res => setNumMessages(res.data.current_messages))
-      .catch(err => console.error(err));
+    // If the cookie doesn't have a selectedCharacter, get one from the server
+    if (!gameCookie.selectedCharacter) {
+      axios.post(base_url + '/change_character', { gameCookie })
+        .then(res => {
+          setSelectedCharacter(res.data.character);
+          updateGameCookie();
+        })
+        .catch(err => console.error(err));
+    }
   }, []);
 
   const handleMessageChange = e => {
@@ -54,69 +58,50 @@ function App() {
     setGuess(e.target.value);
   };
 
-  const updateNumMessages = num => {
-    setNumMessages(num);
-  };
-
   const handleMessageSubmit = e => {
     e.preventDefault();
-    // Check if the maximum number of messages has been reached
-    if (numMessages >= maxMessages) {
-      // If the maximum number of messages has been reached, show an error message
-      setMessages(prevMessages => [...prevMessages, {
-        sender: '- Mystery Character',
-        text: 'You have reached the maximum number of messages. Please guess who you are talking to.'
-      }]);
-    } else {
-      // If the maximum number of messages has not been reached, send the message to the server
-      axios.post(base_url + '/chat', { text: messageText })
-        .then(res => {
-          setMessages(prevMessages => [...prevMessages, {
+    axios.post(base_url + '/chat', { text: messageText, gameCookie })
+      .then(res => {
+        setMessages(prevMessages => [...prevMessages, {
             sender: '- You',
             text: res.data.message.text
           }]);
-          setMessages(prevMessages => [...prevMessages, {
+        setMessages(prevMessages => [...prevMessages, {
             sender: '- Mystery Character',
             text: res.data.response
           }]);
-          setMessageText('');
-          updateNumMessages(numMessages + 1); // increment the numMessages state variable
-        })
-        .catch(err => console.error(err));
-    }
-  };
-
-  const handleGuessSubmit = e => {
-    e.preventDefault();
-    // Send a character guess to the server
-    axios.post(base_url + '/guess', { character: guess })
-      .then(res => {
-        if (res.data.correct) {
-          setMessages(prevMessages => [...prevMessages, {
-            sender: '- Mystery Character',
-            text: res.data.response
-          }]);
-        } else {
-          setMessages(prevMessages => [...prevMessages, {
-            sender: '- Mystery Character',
-            text: res.data.response
-          }]);
-        }
-        setGuess('');
+        setMessageText('');
+        setNumMessages(prevNumMessages => prevNumMessages + 1);
+        updateGameCookie();
       })
       .catch(err => console.error(err));
   };
 
-  const handleRestart = () => {
-    axios.post(base_url + '/reset')
+  const handleGuessSubmit = e => {
+    e.preventDefault();
+    axios.post(base_url + '/guess', { guess: guess, gameCookie })
       .then(res => {
-        // Reset the number of messages and the list of messages
-        setNumMessages(0);
+        setMessages(prevMessages => [...prevMessages, {
+            sender: '- Mystery Character',
+            text: res.data.response
+          }]);
+        setGuess('');
+        updateGameCookie();
+      })
+      .catch(err => console.error(err));
+  };
+
+  // this is looking good
+  const handleRestart = () => {
+    axios.post(base_url + '/change_character', { gameCookie })
+      .then(res => {
+        const newCharacter = res.data.character;
+        const newNumMessages = 0;
+
+        setSelectedCharacter(newCharacter);
+        setNumMessages(newNumMessages);
         setMessages([]);
-        // Get the new selected character from the server
-        axios.get(base_url + '/selected_character')
-          .then(res => setSelectedCharacter(res.data.selected_character))
-          .catch(err => console.error(err));
+        Cookies.set('game_cookie', JSON.stringify({ numMessages: newNumMessages, selectedCharacter: newCharacter }));
       })
       .catch(err => console.error(err));
   };
@@ -154,7 +139,6 @@ function App() {
       <Button onClick={handleRestart}>
         Restart
       </Button>
-      {/* Display the message counter */}
       <div>
         {numMessages}/{maxMessages} messages sent
       </div>
@@ -163,4 +147,3 @@ function App() {
 };
 
 export default App;
-
