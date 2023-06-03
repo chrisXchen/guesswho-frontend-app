@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Cookies from 'js-cookie';
-import Chat from './Chat';
+import Chat from './components/Chat/Chat';
+import MessageInput from './components/MessageInput/MessageInput';
 import './App.css';
-import { FormControl, InputLabel, Input, Button, Select, MenuItem } from '@material-ui/core';
+import { FormControl, InputLabel, Select, MenuItem, Button } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
 
 const useStyles = makeStyles({
@@ -15,36 +16,31 @@ const useStyles = makeStyles({
 const base_url = process.env.REACT_APP_BASE_URL;
 
 function App() {
-  const [maxMessages, setMaxMessages] = useState(5); // Maximum number of messages
+  const [maxMessages, setMaxMessages] = useState(5);
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState('');
   const [guess, setGuess] = useState('');
   const [characters, setCharacters] = useState([]);
 
-  // Initialize game state from the cookie, or with default values
   const gameCookie = Cookies.get('game_cookie') ? JSON.parse(Cookies.get('game_cookie')) : { numMessages: 0, selectedCharacter: '' };
   const [numMessages, setNumMessages] = useState(gameCookie.numMessages);
   const [selectedCharacter, setSelectedCharacter] = useState(gameCookie.selectedCharacter);
 
   const classes = useStyles();
 
-  // this and useEffect needed the biggest changes so far
   const updateGameCookie = () => {
     Cookies.set('game_cookie', JSON.stringify({ numMessages, selectedCharacter }));
   };
 
   useEffect(() => {
-    // Get the characters from the server when the component mounts
     axios.get(base_url + '/characters')
       .then(res => setCharacters(res.data.characters))
       .catch(err => console.error(err));
 
-    // If the cookie doesn't have a selectedCharacter, get one from the server
     if (!gameCookie.selectedCharacter) {
       axios.post(base_url + '/change_character', { gameCookie })
         .then(res => {
           setSelectedCharacter(res.data.character);
-
           Cookies.set('game_cookie', JSON.stringify({ numMessages: numMessages, selectedCharacter: res.data.character }));
         })
         .catch(err => console.error(err));
@@ -55,11 +51,6 @@ function App() {
     setMessageText(e.target.value);
   };
 
-  const handleGuessChange = e => {
-    setGuess(e.target.value);
-  };
-
-  // who knows maybe i just got this one working fine too
   const handleMessageSubmit = e => {
     e.preventDefault();
     axios.post(base_url + '/chat', { text: messageText, gameCookie })
@@ -82,10 +73,13 @@ function App() {
         }
         setMessageText('');
         setNumMessages(newNumMessages)
-
         Cookies.set('game_cookie', JSON.stringify({ numMessages: newNumMessages, selectedCharacter: selectedCharacter }));
       })
       .catch(err => console.error(err));
+  };
+
+  const handleGuessChange = e => {
+    setGuess(e.target.value);
   };
 
   const handleGuessSubmit = e => {
@@ -102,13 +96,11 @@ function App() {
       .catch(err => console.error(err));
   };
 
-  // this is looking good
   const handleRestart = () => {
     axios.post(base_url + '/change_character', { gameCookie })
       .then(res => {
         const newCharacter = res.data.character;
         const newNumMessages = 0;
-
         setSelectedCharacter(newCharacter);
         setNumMessages(newNumMessages);
         setMessages([]);
@@ -117,21 +109,15 @@ function App() {
       .catch(err => console.error(err));
   };
 
-
   return (
     <div className="App">
+      <h1> You are now guessing Game of Thrones characters. Good luck! </h1>
       <Chat messages={messages} />
-      <FormControl className={classes.formControl}>
-        <InputLabel htmlFor="message-input">Chat</InputLabel>
-        <Input
-          id="message-input"
-          value={messageText}
-          onChange={handleMessageChange}
-        />
-        <Button type="submit" onClick={handleMessageSubmit}>
-          Send
-        </Button>
-      </FormControl>
+      <MessageInput
+        messageText={messageText}
+        handleMessageChange={handleMessageChange}
+        handleMessageSubmit={handleMessageSubmit}
+      />
       <FormControl className={classes.formControl}>
         <InputLabel htmlFor="guess-input">Enter a character name...</InputLabel>
         <Select
@@ -147,14 +133,12 @@ function App() {
           Guess
         </Button>
       </FormControl>
-      <Button onClick={handleRestart}>
-        Restart
-      </Button>
+      <Button onClick={handleRestart}>Restart Game</Button>
       <div>
         {numMessages}/{maxMessages} messages sent
       </div>
     </div>
   );
-};
+}
 
 export default App;
