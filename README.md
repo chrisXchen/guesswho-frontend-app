@@ -7,7 +7,7 @@
 - [x] get chat feature working in the same way, however chat messages are only stored on the brwoser in the react states (if they reload the page then they lose their previous messages)
 - [ ] refactor backend (easy)
 - [ ] add tests for backend routes (medium)
-- [ ] refactor frontend, this means finally making components and pages (hard)
+- [x] refactor frontend, this means finally making components and pages (hard)
 
 ### Medium term goals (features I want to get out soon)
 
